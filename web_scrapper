@@ -1,0 +1,220 @@
+# -*- coding: utf-8 -*-
+"""
+@author: Diego
+"""
+
+from urllib.request import urlopen, urljoin, urlparse
+import requests
+import scrapy
+from scrapy import Selector
+import re
+from bs4 import BeautifulSoup
+import pandas as pd
+from collections import deque
+
+
+#Download website
+def download_page(url):
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36"}
+    return requests.get(url, headers=headers).text;
+
+
+#Extract links using scrapy Selector and x Path
+    
+def extract_links(page):
+    host = urlparse(target_url)[1]+"/shop/gb/groceries/all-beef";
+    
+    sel=Selector(text=page);
+    sel=sel.xpath('//div[@class="productNameAndPromotions"]/h3/a/@href').extract();
+   
+    return [link for link in sel if link[8:55] == host]
+
+
+def extract_data(product_url,product_p):
+   
+    try:    
+        sel=Selector(text=product_p)
+        dict1={}
+        dict2={}
+        
+    #   dict['producto url']=product_url
+        
+        dict1['Product Name']=sel.xpath('//h1/text()').extract()[0];
+        
+        print(dict1['Product Name'])
+         
+        x=sel.xpath('//p[@class="pricePerUnit"]/text()').extract()
+        
+                  
+        dict1['Price']=x[0].strip()
+        
+        dict1['Unit']=sel.xpath('//span[@class="pricePerUnitUnit"]/text()').extract()[0]
+        
+        dict1['Rating']=sel.xpath('//label[@class="numberOfReviews"]/img/@alt').extract()[0]
+        
+        dict1['Item Code']=sel.xpath('//p[@class="itemCode"]/text()').extract()[0].strip().split()[-1]
+        
+        dict2=nutritional_data(product_p)
+        
+        dict2['Item Code']=dict1['Item Code']
+                      
+        return dict1, dict2
+        
+    except:
+        
+        return {"fail":product_url}
+    
+   
+
+def nutritional_data(page):
+    soup=BeautifulSoup(page,'html.parser') 
+    
+    #obtain raw titles from nutritional table 
+    
+    titles=[]
+    
+    for line in soup.find_all('th',class_="rowHeader"):
+        titles.append(line.text);
+    
+    energy=['Energy KJules']
+    
+    titles=energy+titles;
+    
+#   print(titles)
+    
+    #Obtain row data from nutrutional table
+    
+   
+#    for line in soup.find_all('th',class_="rowHeader"):
+#        print(line.text.strip())
+        
+    measures=[]
+     
+       
+    for table_row in soup.find('table').find_all('tr')[1:]:
+        line = table_row.find_all('td')[0]
+        measures.append(line.text.strip())
+        
+       
+#        measures.append(line.text.strip())
+#        if measures[-1][0]=="<":
+#            measures[-1]=measures[-1][1:]
+#            
+    # Obtain only first column data        
+     
+    #measures=measures[0:23:2]
+    
+    #return Dictionary
+       
+    dict2=dict(zip(titles,measures))
+    
+    print("\nDictionary2")
+    
+    print(dict2)
+    # end of nutritional data function
+    return dict2
+
+
+# %% Execute scrapper     
+    
+
+    
+if __name__== '__main__':
+    target_url='https://www.sainsburys.co.uk/webapp/wcs/stores/servlet/gb/groceries/meat-fish/all-beef?langId=44&storeId=10151&krypto=ASOce5KvCeeajuVbdspFqalZaxFVfHRTEtlb8yRuQECwbcytK%2FalAqrEmBP9eYAMWpdM%2Be6gftIQ49Ct8GCCPVahIYXAC3DKUPyz%2Fi%2Fa1uhL0CEVDiFuC5c0SPaifHxV&ddkey=https%3Agb%2Fgroceries%2Fmeat-fish%2Fall-beef#langId=44&storeId=10151&catalogId=10123&categoryId=276043&parent_category_rn=13343&top_category=13343&pageSize=60&orderBy=FAVOURITES_ONLY%7CSEQUENCING%7CTOP_SELLERS&searchTerm=&beginIndex=0&hideFilters=true';
+
+    downloaded=download_page(target_url);
+    
+    visited=set()
+   
+    df_data=pd.DataFrame()
+    
+    df_nutrition_table=pd.DataFrame()
+    
+    # BDS search algorithm
+    
+    queue=deque()
+    queue.append(target_url)
+    
+    flag=0
+    
+    layer=0
+    
+    while queue:
+        
+        cvisit=queue.popleft()
+        
+        if cvisit in visited:
+            continue
+        
+        visited.add(cvisit)
+        downloaded=download_page(cvisit)
+        links=extract_links(downloaded)
+        queue.extend(links)
+        
+        flag=flag+1
+        
+        layer=layer+1
+        
+        if layer<2:
+            continue
+        
+        if flag==20:
+            break
+        
+        try:
+             
+            dict1, dict2=extract_data(cvisit,download_page(cvisit))
+            
+                       
+            # Basic data
+            
+            df1=pd.DataFrame.from_dict(dict1,orient='index')
+            
+                
+            code=df1.loc["Item Code"]
+                
+            df1=df1.drop("Item Code")
+            
+            df1["Item Code"]=code[0]
+            
+            df1.columns=["Values", "Item code"]
+            
+            df1.index.name="Data"
+            
+            df1=df1.reset_index()
+            
+            df1=df1.set_index(["Item code","Data"])
+            
+            print("Flag")
+            print(flag)
+            
+            
+            df_data=df_data.append(df1)
+           
+            # Nutritional Table
+            
+            df2=pd.DataFrame.from_dict(dict2,orient='index')
+              
+            code=df2.loc["Item Code"]
+                
+            df2=df2.drop("Item Code")
+            
+            df2["Item Code"]=code[0]
+            
+            df2.columns=["Values", "Item code"]
+            
+            df2.index.name="Nutrients"
+            
+            df2=df2.reset_index()
+            
+            df2=df2.set_index(["Item code","Nutrients"])
+                      
+            df_nutrition_table=df_nutrition_table.append(df2)
+            
+        except:
+            continue
+    
+    print(df_data)  
+    
+    print(df_nutrition_table)
+    
