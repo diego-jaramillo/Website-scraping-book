@@ -1,4 +1,4 @@
 # Website-scraping-book
 My own version of website scraping books' excercises
 
-I have done my own codes of the Website Scraping tool, I mix Beautifuoul Soup, 
+These are my codes version related to the book Website Scraping with phyton, I use Beautiful soup, request and scrapy Selectors, 
