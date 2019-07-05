@@ -13,13 +13,14 @@ import pandas as pd
 from collections import deque
 
 
-#Download website
+#Download webpage
+
 def download_page(url):
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36"}
     return requests.get(url, headers=headers).text;
 
 
-#Extract links using scrapy Selector and x Path
+#Extract links using scrapy selector and x Path
     
 def extract_links(page):
     host = urlparse(target_url)[1]+"/shop/gb/groceries/all-beef";
@@ -29,6 +30,7 @@ def extract_links(page):
    
     return [link for link in sel if link[8:55] == host]
 
+# Obtain main data using Selector and Xpath
 
 def extract_data(product_url,product_p):
    
@@ -64,7 +66,7 @@ def extract_data(product_url,product_p):
         
         return {"fail":product_url}
     
-   
+ # Obtain nutritional data using Beautiful Soup
 
 def nutritional_data(page):
     soup=BeautifulSoup(page,'html.parser') 
@@ -80,30 +82,18 @@ def nutritional_data(page):
     
     titles=energy+titles;
     
-#   print(titles)
     
     #Obtain row data from nutrutional table
-    
    
-#    for line in soup.find_all('th',class_="rowHeader"):
-#        print(line.text.strip())
-        
+           
     measures=[]
      
        
     for table_row in soup.find('table').find_all('tr')[1:]:
         line = table_row.find_all('td')[0]
         measures.append(line.text.strip())
-        
-       
-#        measures.append(line.text.strip())
-#        if measures[-1][0]=="<":
-#            measures[-1]=measures[-1][1:]
-#            
-    # Obtain only first column data        
      
-    #measures=measures[0:23:2]
-    
+   
     #return Dictionary
        
     dict2=dict(zip(titles,measures))
@@ -130,7 +120,7 @@ if __name__== '__main__':
     
     df_nutrition_table=pd.DataFrame()
     
-    # BDS search algorithm
+    # breadth first search algorithm
     
     queue=deque()
     queue.append(target_url)
